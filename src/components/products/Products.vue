@@ -1,18 +1,18 @@
 <script setup lang="ts">
 
-import Product from "@/components/products/Product.vue";
 import axios from "axios";
-import { onMounted, ref } from "vue";
+import { onMounted, reactive, ref } from "vue";
 
-interface ProductsResponse {
-  products: Product[];
+export interface ProductsResponse {
+  products: ProductSchema[];
   metadata: {
     items: number;
     offset: number;
   }
 }
 
-interface Product {
+export interface ProductSchema {
+  _id: string;
   name: string;
   description: string;
   media: {
@@ -22,17 +22,95 @@ interface Product {
       }
     }
   };
-  price: {
+  priceData: {
     price: string;
     currency: string;
   }
 }
 
-let products = ref([] as Product[]);
+let products = ref([] as ProductSchema[]);
+let editModalVisible = ref(false);
+let modalTitle: 'Create' | 'Edit' = 'Create';
 
 async function fetchProductsList() {
-  const fetchingProducts = await axios.get<ProductsResponse>('http://localhost:3000/products').then((res) => res.data);
-  products.value = fetchingProducts.products;
+  products.value = await axios.get<ProductSchema[]>('http://localhost:3000/products').then((res) => res.data) || [];
+}
+
+function showEditModal(row: ProductSchema) {
+  modalTitle = 'Edit';
+  editModalVisible.value = true;
+  form.name = row.name;
+  form.description = row.description;
+  form.price = Number(row.priceData.price);
+  form._id = row._id;
+}
+
+function createNewProduct() {
+  modalTitle = 'Create';
+  editModalVisible.value = true;
+}
+
+let form = reactive({
+  _id: '',
+  name: '',
+  description: '',
+  price: 0,
+});
+
+const onSubmit = async () => {
+  form.price = Number(form.price);
+  if (form._id.length) {
+    await editProductReq();
+  } else {
+    await createProductReq();
+  }
+
+  editModalVisible.value = false;
+}
+
+async function createProductReq() {
+  const newProduct = await axios.post<{
+    product: ProductSchema,
+  }>(`http://localhost:3000/products`, form).then((res) => res.data)
+
+  form = reactive({
+    _id: '',
+    name: '',
+    description: '',
+    price: 0,
+  });
+
+  products.value.push(newProduct.product);
+}
+async function editProductReq() {
+  const updateResponse = await axios.patch<{
+    product: ProductSchema,
+  }>(`http://localhost:3000/products/${form._id}`, form).then((res) => res.data)
+
+  form = reactive({
+    _id: '',
+    name: '',
+    description: '',
+    price: 0,
+  });
+
+  const productKey = products.value.findIndex((el) => el._id === updateResponse.product._id);
+  if (productKey >= 0) {
+    products.value[productKey].name = updateResponse.product.name;
+    products.value[productKey].description = updateResponse.product.description;
+    products.value[productKey].priceData.price = updateResponse.product.priceData.price;
+  }
+}
+
+async function deleteProductReq(id: string) {
+  await axios.delete<{
+    product: ProductSchema,
+  }>(`http://localhost:3000/products/${id}`).then((res) => res.data);
+
+  const deletedIndex = products.value.findIndex((el) => el._id === id);
+  if (deletedIndex > -1) {
+    products.value.splice(deletedIndex, 1);
+  }
 }
 
 onMounted(async () => {
@@ -43,21 +121,110 @@ onMounted(async () => {
 
 <template>
   <h1>Products Page</h1>
-  <div class="content-block">
-    <div class="product-list" v-if="products.length">
-      <Product v-for="(product, index) in products" v-bind:product="product" v-bind:index="index"/>
+  <div class="content-block" v-if="products.length">
+    <div class="actions-row">
+      <el-button @click="createNewProduct" type="primary">Create Product</el-button>
     </div>
+    <el-table :data="products">
+      <el-table-column label="Image">
+        <template #default="scope">
+          <img :src="scope?.row.media?.mainMedia?.image?.url" alt="Product Image" class="product-image">
+        </template>
+      </el-table-column>
+      <el-table-column label="Title" property="name"/>
+      <el-table-column label="Price">
+        <template #default="scope">
+          <span class="product-price">{{scope.row.priceData.price}} {{scope.row.priceData.currency}}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="Description">
+        <template #default="scope">
+          <div class="product-description" v-html="scope.row.description"></div>
+        </template>
+      </el-table-column>
+      <el-table-column label="Actions">
+        <template #default="scope">
+          <div class="product-actions">
+            <el-button type="warning" @click="showEditModal(scope.row)">Edit</el-button>
+            <el-button type="danger" @click="deleteProductReq(scope.row._id)">Delete</el-button>
+          </div>
+        </template>
+      </el-table-column>
+    </el-table>
   </div>
+
+  <el-dialog
+      v-model="editModalVisible"
+      width="500"
+  >
+    <template #title>
+      <span class="modal-title"> {{modalTitle}} Product </span>
+    </template>
+    <el-form :model="form">
+      <el-row>
+        <el-col :span="11">
+          <el-form-item label="Product Name" label-position="top">
+            <el-input v-model="form.name"/>
+          </el-form-item>
+        </el-col>
+        <el-col :span="2"></el-col>
+        <el-col :span="11">
+          <el-form-item label="Price" label-position="top">
+            <el-input v-model="form.price" type="number"/>
+          </el-form-item>
+        </el-col>
+      </el-row>
+      <el-form-item label="Description" label-position="top">
+        <el-input v-model="form.description" type="textarea" resize="none"/>
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="editModalVisible = false">Cancel</el-button>
+        <el-button type="primary" @click="onSubmit">
+          {{ modalTitle }}
+        </el-button>
+      </div>
+    </template>
+  </el-dialog>
 </template>
 
 <style scoped>
-    .product-list {
+
+    .content-block {
+      max-width: 80vw;
+      min-width: 60vw;
+    }
+
+    .product-image {
+      width: 100px;
+    }
+
+    .product-price {
+      font-weight: bold;
+    }
+    .product-actions {
       display: flex;
-      flex-direction: row;
+      flex-direction: column;
       align-items: center;
-      justify-content: flex-start;
-      break-after: auto;
-      flex-wrap: wrap;
-      max-width: 50vw;
+      justify-content: space-between;
+
+      * {
+        margin: 0.5em 0;
+      }
+    }
+
+    .actions-row {
+      display: flex;
+      width: 100%;
+      align-items: center;
+      justify-content: flex-end;
+      margin-bottom: 1em;
+    }
+
+    .modal-title {
+      color: black;
+      font-weight: bold;
+      font-size: 16px;
     }
 </style>
