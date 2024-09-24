@@ -26,7 +26,14 @@ export interface ProductSchema {
   priceData: {
     price: string;
     currency: string;
-  }
+  },
+  productOptions: {
+    name: string,
+    choices: {
+      value: string;
+      description: string;
+    }[]
+  }[]
 }
 
 let products = ref([] as ProductSchema[]);
@@ -58,6 +65,11 @@ function showEditModal(row: ProductSchema) {
   form.description = row.description;
   form.price = Number(row.priceData.price);
   form._id = row._id;
+  form.variants = row.productOptions.map((el) => ({
+    name: el.name,
+    options: el.choices.map((o) => o.value),
+  }));
+  optionsForm.input = row.productOptions.map(el => '');
 }
 
 function createNewProduct() {
@@ -97,6 +109,10 @@ function addVariant() {
   optionsForm.input.push('');
 }
 
+function removeVariant(index: number) {
+  form.variants.splice(index, 1);
+}
+
 function addVariantOption(variantKey: number) {
   const val = optionsForm.input[variantKey];
   form.variants[variantKey].options.push(val);
@@ -129,6 +145,7 @@ async function editProductReq() {
     products.value[productKey].name = updateResponse.product.name;
     products.value[productKey].description = updateResponse.product.description;
     products.value[productKey].priceData.price = updateResponse.product.priceData.price;
+    products.value[productKey].productOptions = updateResponse.product.productOptions;
   }
 }
 
@@ -215,7 +232,7 @@ onMounted(async () => {
         </div>
         <div class="variants-block" v-for="(variant, index) of form.variants">
           <div class="top">
-            <el-icon><Delete /></el-icon>
+            <el-icon size="medium" @click="removeVariant(index)"><Delete /></el-icon>
           </div>
           <el-form-item label="Option Name" label-position="top">
             <el-input v-model="form.variants[index].name" />
