@@ -55,7 +55,7 @@ let form = reactive({
 });
 
 async function fetchProductsList() {
-  products.value = await axios.get<ProductSchema[]>('http://localhost:3000/products').then((res) => res.data) || [];
+  products.value = await axios.get<ProductSchema[]>(`${import.meta.env.VITE_API_URL}/products`).then((res) => res.data) || [];
 }
 
 function showEditModal(row: ProductSchema) {
@@ -127,7 +127,7 @@ function removeOption(index: number, optionIndex: number) {
 async function createProductReq() {
   const newProduct = await axios.post<{
     product: ProductSchema,
-  }>(`http://localhost:3000/products`, form).then((res) => res.data)
+  }>(`${import.meta.env.VITE_API_URL}/products`, form).then((res) => res.data)
 
   resetForm();
 
@@ -136,7 +136,7 @@ async function createProductReq() {
 async function editProductReq() {
   const updateResponse = await axios.patch<{
     product: ProductSchema,
-  }>(`http://localhost:3000/products/${form._id}`, form).then((res) => res.data)
+  }>(`${import.meta.env.VITE_API_URL}/products/${form._id}`, form).then((res) => res.data)
 
   resetForm();
 
