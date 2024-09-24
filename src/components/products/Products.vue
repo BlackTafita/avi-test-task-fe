@@ -1,5 +1,6 @@
 <script setup lang="ts">
 
+import { Delete } from "@element-plus/icons-vue";
 import axios from "axios";
 import { onMounted, reactive, ref } from "vue";
 
@@ -31,6 +32,20 @@ export interface ProductSchema {
 let products = ref([] as ProductSchema[]);
 let editModalVisible = ref(false);
 let modalTitle: 'Create' | 'Edit' = 'Create';
+let optionsForm = reactive({
+  input: [] as string[],
+});
+let form = reactive({
+  _id: '',
+  name: '',
+  description: '',
+  price: 0,
+  variants: [
+  ] as {
+    name: string,
+    options: string[],
+  }[],
+});
 
 async function fetchProductsList() {
   products.value = await axios.get<ProductSchema[]>('http://localhost:3000/products').then((res) => res.data) || [];
@@ -50,12 +65,18 @@ function createNewProduct() {
   editModalVisible.value = true;
 }
 
-let form = reactive({
-  _id: '',
-  name: '',
-  description: '',
-  price: 0,
-});
+function resetForm() {
+  form = reactive({
+    _id: '',
+    name: '',
+    description: '',
+    price: 0,
+    variants: [] as {
+      name: string,
+      options: string[],
+    }[],
+  });
+}
 
 const onSubmit = async () => {
   form.price = Number(form.price);
@@ -68,17 +89,31 @@ const onSubmit = async () => {
   editModalVisible.value = false;
 }
 
+function addVariant() {
+  form.variants.push({
+    name: '',
+    options: [],
+  });
+  optionsForm.input.push('');
+}
+
+function addVariantOption(variantKey: number) {
+  const val = optionsForm.input[variantKey];
+  form.variants[variantKey].options.push(val);
+  optionsForm.input[variantKey] = '';
+}
+
+function removeOption(index: number, optionIndex: number) {
+  optionsForm.input.splice(optionIndex, 1);
+  form.variants[index].options.splice(optionIndex, 1);
+}
+
 async function createProductReq() {
   const newProduct = await axios.post<{
     product: ProductSchema,
   }>(`http://localhost:3000/products`, form).then((res) => res.data)
 
-  form = reactive({
-    _id: '',
-    name: '',
-    description: '',
-    price: 0,
-  });
+  resetForm();
 
   products.value.push(newProduct.product);
 }
@@ -87,12 +122,7 @@ async function editProductReq() {
     product: ProductSchema,
   }>(`http://localhost:3000/products/${form._id}`, form).then((res) => res.data)
 
-  form = reactive({
-    _id: '',
-    name: '',
-    description: '',
-    price: 0,
-  });
+  resetForm();
 
   const productKey = products.value.findIndex((el) => el._id === updateResponse.product._id);
   if (productKey >= 0) {
@@ -177,6 +207,38 @@ onMounted(async () => {
       <el-form-item label="Description" label-position="top">
         <el-input v-model="form.description" type="textarea" resize="none"/>
       </el-form-item>
+      <el-divider></el-divider>
+      <div class="variants-list">
+        <div class="variants-title">
+          <span class="title">Variants</span>
+          <el-link type="primary" @click="addVariant">Add Variants</el-link>
+        </div>
+        <div class="variants-block" v-for="(variant, index) of form.variants">
+          <div class="top">
+            <el-icon><Delete /></el-icon>
+          </div>
+          <el-form-item label="Option Name" label-position="top">
+            <el-input v-model="form.variants[index].name" />
+          </el-form-item>
+
+              <el-form-item label="Value" label-position="top">
+                <el-row>
+                  <el-col :span="16">
+                    <el-input v-model="optionsForm.input[index]"/>
+                  </el-col>
+                  <el-col :span="2"></el-col>
+                  <el-col :span="6" class="option-btn">
+                    <el-button type="primary" :disabled="!optionsForm.input[index].length" @click="addVariantOption(index)">Add</el-button>
+                  </el-col>
+                </el-row>
+              </el-form-item>
+              <div class="options-list">
+                <el-tag v-for="(option, optIndex) of variant.options" :key="index" closable type="primary" @close="removeOption(index, optIndex)">
+                  {{option}}
+                </el-tag>
+              </div>
+        </div>
+      </div>
     </el-form>
     <template #footer>
       <div class="dialog-footer">
@@ -203,6 +265,9 @@ onMounted(async () => {
     .product-price {
       font-weight: bold;
     }
+    .product-description {
+      font-size: 10px;
+    }
     .product-actions {
       display: flex;
       flex-direction: column;
@@ -226,5 +291,31 @@ onMounted(async () => {
       color: black;
       font-weight: bold;
       font-size: 16px;
+    }
+
+    .variants-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1em;
+
+      .title {
+        font-size: 14px;
+        font-weight: bold;
+      }
+    }
+
+    .variants-block {
+      .top {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+      }
+    }
+
+    .option-btn {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
     }
 </style>
