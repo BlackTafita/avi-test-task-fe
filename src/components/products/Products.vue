@@ -69,7 +69,7 @@ function showEditModal(row: ProductSchema) {
     name: el.name,
     options: el.choices.map((o) => o.value),
   }));
-  optionsForm.input = row.productOptions.map(el => '');
+  optionsForm.input = row.productOptions.map(() => '');
 }
 
 function createNewProduct() {
